@@ -1,12 +1,6 @@
 name: Terraform and Deploy Static Website
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "terraform/**"
-      - "website/**"
-      - ".github/workflows/deploy.yml"
   push:
     branches: [main]
     paths:
@@ -88,11 +82,9 @@ jobs:
             -var="bucket_name=${{ vars.S3_BUCKET_NAME }}"
 
       - name: Terraform apply
-        if: github.event_name != 'pull_request'
         run: terraform apply -auto-approve tfplan
 
       - name: Read Terraform outputs
-        if: github.event_name != 'pull_request'
         id: tf_outputs
         run: |
           echo "bucket_name=$(terraform output -raw website_bucket_name)" >> "$GITHUB_OUTPUT"
@@ -101,7 +93,6 @@ jobs:
 
   deploy:
     name: Deploy Website
-    if: github.event_name != 'pull_request'
     needs: terraform
     runs-on: ubuntu-latest
     environment: production
