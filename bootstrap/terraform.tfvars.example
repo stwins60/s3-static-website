@@ -1,0 +1,11 @@
+aws_region             = "us-east-1"
+project_name           = "cloudlaunch-static-site"
+github_owner           = "your-github-username"
+github_repository      = "your-repository-name"
+github_branch          = "main"
+terraform_state_bucket = "replace-with-a-globally-unique-state-bucket"
+website_bucket_name    = "replace-with-a-globally-unique-website-bucket"
+
+# Set false if the provider already exists in the account.
+create_github_oidc_provider = true
+# existing_github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"

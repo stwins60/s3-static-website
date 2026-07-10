@@ -1,0 +1,6 @@
+aws_region   = "us-east-1"
+project_name = "cloudlaunch-static-site"
+bucket_name  = "replace-with-a-globally-unique-bucket-name"
+
+# Useful for disposable demonstration environments. Leave false for production.
+force_destroy_bucket = false

@@ -1,0 +1,160 @@
+name: Terraform and Deploy Static Website
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "website/**"
+      - ".github/workflows/deploy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "website/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: static-website-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/cloudlaunch-static-site-github-terraform
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    environment: production
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    outputs:
+      bucket_name: ${{ steps.tf_outputs.outputs.bucket_name }}
+      distribution_id: ${{ steps.tf_outputs.outputs.distribution_id }}
+      website_url: ${{ steps.tf_outputs.outputs.website_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: github-terraform-${{ github.run_id }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.12.2"
+          terraform_wrapper: false
+
+      - name: Terraform format check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=static-website/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: |
+          terraform plan \
+            -out=tfplan \
+            -var="aws_region=${{ vars.AWS_REGION }}" \
+            -var="bucket_name=${{ vars.S3_BUCKET_NAME }}"
+
+      - name: Terraform apply
+        if: github.event_name != 'pull_request'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Read Terraform outputs
+        if: github.event_name != 'pull_request'
+        id: tf_outputs
+        run: |
+          echo "bucket_name=$(terraform output -raw website_bucket_name)" >> "$GITHUB_OUTPUT"
+          echo "distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "website_url=$(terraform output -raw website_url)" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy Website
+    if: github.event_name != 'pull_request'
+    needs: terraform
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials through OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: github-website-${{ github.run_id }}
+
+      - name: Synchronize website files to S3
+        run: |
+          aws s3 sync website/ "s3://${{ needs.terraform.outputs.bucket_name }}" \
+            --delete \
+            --only-show-errors
+
+      - name: Set long-lived cache headers on static assets
+        run: |
+          aws s3 cp website/ "s3://${{ needs.terraform.outputs.bucket_name }}" \
+            --recursive \
+            --exclude "*" \
+            --include "*.css" \
+            --include "*.js" \
+            --include "*.png" \
+            --include "*.jpg" \
+            --include "*.jpeg" \
+            --include "*.svg" \
+            --include "*.webp" \
+            --cache-control "public,max-age=31536000,immutable" \
+            --metadata-directive REPLACE \
+            --only-show-errors
+
+      - name: Prevent long-term HTML caching
+        run: |
+          aws s3 cp website/ "s3://${{ needs.terraform.outputs.bucket_name }}" \
+            --recursive \
+            --exclude "*" \
+            --include "*.html" \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --content-type "text/html" \
+            --metadata-directive REPLACE \
+            --only-show-errors
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ needs.terraform.outputs.distribution_id }}" \
+            --paths "/*"
+
+      - name: Publish deployment summary
+        run: |
+          {
+            echo "## Static website deployed"
+            echo ""
+            echo "${{ needs.terraform.outputs.website_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

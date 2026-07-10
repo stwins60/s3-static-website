@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A simple static website deployed to AWS with GitHub Actions." />
+  <title>CloudLaunch</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="navbar">
+    <a class="logo" href="/">CloudLaunch</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#about">About</a>
+      <a class="nav-button" href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-content">
+        <p class="eyebrow">AWS · Terraform · GitHub Actions</p>
+        <h1>A simple website deployed automatically to AWS.</h1>
+        <p class="hero-copy">
+          This static website is stored in a private Amazon S3 bucket and delivered
+          securely through Amazon CloudFront.
+        </p>
+        <div class="hero-actions">
+          <a class="primary-button" href="#features">Explore the setup</a>
+          <a class="secondary-button" href="https://github.com/" target="_blank" rel="noreferrer">
+            View GitHub
+          </a>
+        </div>
+      </div>
+
+      <div class="terminal-card" aria-label="Deployment process">
+        <div class="terminal-header">
+          <span></span><span></span><span></span>
+        </div>
+        <pre><code>$ git push origin main
+
+✓ GitHub Actions started
+✓ AWS credentials obtained with OIDC
+✓ Website synchronized to S3
+✓ CloudFront cache invalidated
+✓ Deployment completed</code></pre>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Architecture</p>
+        <h2>Small, secure, and easy to maintain.</h2>
+      </div>
+
+      <div class="card-grid">
+        <article class="card">
+          <div class="card-number">01</div>
+          <h3>Private S3 Storage</h3>
+          <p>The website files are stored in an encrypted S3 bucket with public access blocked.</p>
+        </article>
+
+        <article class="card">
+          <div class="card-number">02</div>
+          <h3>CloudFront Delivery</h3>
+          <p>CloudFront serves the site globally over HTTPS and accesses S3 through OAC.</p>
+        </article>
+
+        <article class="card">
+          <div class="card-number">03</div>
+          <h3>OIDC Deployment</h3>
+          <p>GitHub Actions assumes a scoped IAM role without storing AWS access keys.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="about" class="section split-section">
+      <div>
+        <p class="eyebrow">Infrastructure as Code</p>
+        <h2>Everything is repeatable.</h2>
+      </div>
+      <p>
+        Terraform creates the S3 bucket, CloudFront distribution, bucket policy,
+        GitHub OIDC provider, and deployment IAM role. Pushes to the main branch
+        publish the contents of the website directory automatically.
+      </p>
+    </section>
+
+    <section id="contact" class="cta">
+      <p class="eyebrow">Ready to deploy?</p>
+      <h2>Update the content, push to GitHub, and let the pipeline handle the rest.</h2>
+      <a class="primary-button" href="mailto:hello@example.com">hello@example.com</a>
+    </section>
+  </main>
+
+  <footer>
+    <p>© <span id="year"></span> CloudLaunch. Built on AWS.</p>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
